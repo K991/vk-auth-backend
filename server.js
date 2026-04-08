@@ -1,133 +1,42 @@
 import express from "express";
-import cors from "cors";
-import crypto from "crypto";
+import fetch from "node-fetch";
 
 const app = express();
-app.use(cors());
 
-const PORT = process.env.PORT || 10000;
+const CLIENT_ID = process.env.VK_CLIENT_ID;
+const CLIENT_SECRET = process.env.VK_CLIENT_SECRET;
+const REDIRECT_URI = "https://vk-auth-backend-pfj7.onrender.com/vk/callback";
 
-// Лучше хранить в Render Environment
-const VK_CLIENT_ID = process.env.VK_CLIENT_ID;
-const VK_CLIENT_SECRET = process.env.VK_CLIENT_SECRET;
-const REDIRECT_URI =
-  process.env.VK_REDIRECT_URI;
-const VK_API_VERSION = "5.199";
+// 1. старт авторизации
+app.get("/vk/auth", (req, res) => {
+    const url = `https://id.vk.com/auth?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=code&scope=groups,wall,messages,offline`;
 
-const sessions = new Map();
-
-function vkAuthorizeUrl(sessionId) {
-  const params = new URLSearchParams({
-    client_id: VK_CLIENT_ID,
-    redirect_uri: REDIRECT_URI,
-    response_type: "code",
-    scope: "offline",
-    display: "page",
-    v: VK_API_VERSION,
-    state: sessionId
-  });
-
-  return `https://oauth.vk.com/authorize?${params.toString()}`;
-}
-
-function vkAccessTokenUrl(code) {
-  const params = new URLSearchParams({
-    client_id: VK_CLIENT_ID,
-    client_secret: VK_CLIENT_SECRET,
-    redirect_uri: REDIRECT_URI,
-    code: String(code)
-  });
-
-  return `https://oauth.vk.com/access_token?${params.toString()}`;
-}
-
-app.get("/", (_req, res) => {
-  res.send("vk-auth-backend is running");
+    res.redirect(url);
 });
 
-app.get("/vk/auth/start", (req, res) => {
-  const { type = "user", groupId = "" } = req.query;
-  const sessionId = crypto.randomUUID();
-
-  sessions.set(sessionId, {
-    status: "pending",
-    type: String(type),
-    groupId: String(groupId),
-    createdAt: Date.now()
-  });
-
-  const authUrl = vkAuthorizeUrl(sessionId);
-
-  res.json({
-    sessionId,
-    authUrl
-  });
-});
-
+// 2. callback
 app.get("/vk/callback", async (req, res) => {
-  const { code, error, error_description, state } = req.query;
+    const { code } = req.query;
 
-  if (!state || !sessions.has(String(state))) {
-    return res.status(400).send("Unknown or missing session state");
-  }
+    try {
+        const response = await fetch("https://id.vk.com/oauth2/token", {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({
+                grant_type: "authorization_code",
+                code,
+                client_id: CLIENT_ID,
+                client_secret: CLIENT_SECRET,
+                redirect_uri: REDIRECT_URI
+            })
+        });
 
-  const sessionId = String(state);
+        const data = await response.json();
 
-  if (error) {
-    sessions.set(sessionId, {
-      status: "error",
-      error: `${error}: ${error_description || "VK auth error"}`
-    });
-    return res.status(400).send(`VK auth error: ${error_description || error}`);
-  }
-
-  if (!code) {
-    sessions.set(sessionId, {
-      status: "error",
-      error: "Missing code in callback"
-    });
-    return res.status(400).send("Missing code");
-  }
-
-  try {
-    const response = await fetch(vkAccessTokenUrl(code));
-    const data = await response.json();
-
-    if (!response.ok || data.error) {
-      sessions.set(sessionId, {
-        status: "error",
-        error: data.error_description || data.error || "VK token exchange failed"
-      });
-      return res.status(400).send(`Token exchange failed: ${JSON.stringify(data)}`);
+        res.json(data); // тут придёт access_token
+    } catch (e) {
+        res.send("error");
     }
-
-    sessions.set(sessionId, {
-      status: "done",
-      accessToken: data.access_token || "",
-      userId: data.user_id || null,
-      email: data.email || null
-    });
-
-    return res.send("OK, можно закрыть окно и вернуться в приложение.");
-  } catch (e) {
-    sessions.set(sessionId, {
-      status: "error",
-      error: e instanceof Error ? e.message : "Unknown server error"
-    });
-    return res.status(500).send("Ошибка авторизации");
-  }
 });
 
-app.get("/vk/auth/status", (req, res) => {
-  const { sessionId } = req.query;
-
-  if (!sessionId || !sessions.has(String(sessionId))) {
-    return res.json({ status: "error", error: "Session not found" });
-  }
-
-  return res.json(sessions.get(String(sessionId)));
-});
-
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+app.listen(10000);
