@@ -9,8 +9,8 @@ app.use(cors());
 const PORT = process.env.PORT || 10000;
 
 // 🔐 ТВОИ ДАННЫЕ VK
-const VK_CLIENT_ID = "ТВОЙ_CLIENT_ID";
-const VK_CLIENT_SECRET = "ТВОЙ_CLIENT_SECRET";
+const VK_CLIENT_ID = "54520140";
+const VK_CLIENT_SECRET = "4309a35d4309a35d4309a35dc240364a11443094309a35d2ac48299798c621a4bf21d82";
 
 // ⚠️ ОБЯЗАТЕЛЬНО тот же redirect_uri, что в VK
 const REDIRECT_URI = "https://vk-auth-backend-pfj7.onrender.com/vk/callback";
