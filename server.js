@@ -8,10 +8,10 @@ app.use(cors());
 const PORT = process.env.PORT || 10000;
 
 // Лучше хранить в Render Environment
-const VK_CLIENT_ID = process.env.VK_CLIENT_ID || "54520140";
-const VK_CLIENT_SECRET = process.env.VK_CLIENT_SECRET || "d5ff824ed5ff824ed5ff824eaed6c06b02dd5ffd5ff824ebc29cecd58fad7a76bc11056";
+const VK_CLIENT_ID = process.env.VK_CLIENT_ID;
+const VK_CLIENT_SECRET = process.env.VK_CLIENT_SECRET;
 const REDIRECT_URI =
-  process.env.VK_REDIRECT_URI || "https://vk-auth-backend-pfj7.onrender.com/vk/callback";
+  process.env.VK_REDIRECT_URI;
 const VK_API_VERSION = "5.199";
 
 const sessions = new Map();
